@@ -1,11 +1,11 @@
-import QtQuick 2.15
-import QtQuick.Window 2.15
+import QtQuick 2.12
+import QtQuick.Window 2.12
 
 Window {
     width: 800
     height: 600
     visible: true
-    title: "Hello PyQt5"
+    title: "AutoTel"
 
     Rectangle {
         anchors.fill: parent
@@ -13,7 +13,7 @@ Window {
 
         Text {
             anchors.centerIn: parent
-            text: "Hello QML"
+            text: "Hello AutoTel"
             color: "white"
             font.pixelSize: 30
         }

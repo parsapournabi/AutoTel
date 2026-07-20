@@ -1,5 +1,8 @@
 <RCC>
     <qresource prefix="/">
         <file>qml/main.qml</file>
+        <file>qml/MainWindow.qml</file>
+        <file>qml/GlobalContext.qml</file>
+        <file>qml/Pane.qml</file>
     </qresource>
 </RCC>

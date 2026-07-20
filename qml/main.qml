@@ -7,15 +7,11 @@ Window {
     visible: true
     title: "AutoTel"
 
-    Rectangle {
+    MainWindow {
         anchors.fill: parent
-        color: "#202020"
+    }
 
-        Text {
-            anchors.centerIn: parent
-            text: "Hello AutoTel"
-            color: "white"
-            font.pixelSize: 30
-        }
+    GlobalContext {
+        id: global
     }
 }

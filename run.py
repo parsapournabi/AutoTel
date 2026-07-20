@@ -1,19 +1,15 @@
 # This Python file uses the following encoding: utf-8
 import sys
-from pathlib import Path
+from src.meta import resources_rc
 
-from PySide6.QtGui import QGuiApplication
-from PySide6.QtQuickControls2 import QQuickStyle
-
-from untitled14.qml.Engine import Engine
+from PyQt5.QtWidgets import QApplication
+from PyQt5.QtQml import QQmlApplicationEngine
 
 
 if __name__ == "__main__":
-    QQuickStyle.setStyle("Fusion")
-    app = QGuiApplication(sys.argv)
-    engine = Engine()
-    engine.addImportPath(Path(__file__).parent)
-    engine.loadFromModule("untitled14", "Main")
+    app = QApplication(sys.argv)
+    engine = QQmlApplicationEngine()
+    engine.load("qrc:/qml/main.qml")
     if not engine.rootObjects():
         sys.exit(-1)
     sys.exit(app.exec())

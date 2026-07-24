@@ -8,5 +8,9 @@
         <file>qml/CusLineEdit.qml</file>
         <file>qml/Pane.qml</file>
         <file>qml/ProfileImage.qml</file>
+
+        <file>share/images/Wearily-Logo-AppIcon-Dark.ico</file>
+        <file>share/images/Wearily-Logo-Dark.png</file>
+        <file>share/images/Wearily-Logo-Light.png</file>
     </qresource>
 </RCC>

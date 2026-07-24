@@ -7,8 +7,9 @@ QtObject {
     property var paneBackgroundColor: ["#202020"]
     property var paneBorderColor: darker(paneBackgroundColor, 1.75)
 
-    /** Functions **/
+    property var textColor: ["white"]
 
+    /** Functions **/
     function darker(colors, factor) {
         return colors.map(color => Qt.darker(color, factor));
     }

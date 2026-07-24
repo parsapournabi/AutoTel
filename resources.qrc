@@ -7,5 +7,6 @@
         <file>qml/CusText.qml</file>
         <file>qml/CusLineEdit.qml</file>
         <file>qml/Pane.qml</file>
+        <file>qml/ProfileImage.qml</file>
     </qresource>
 </RCC>

@@ -5,6 +5,7 @@
         <file>qml/GlobalContext.qml</file>
         <file>qml/CusButton.qml</file>
         <file>qml/CusText.qml</file>
+        <file>qml/CusLineEdit.qml</file>
         <file>qml/Pane.qml</file>
     </qresource>
 </RCC>

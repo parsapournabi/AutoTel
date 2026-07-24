@@ -17,5 +17,11 @@ Q.Button {
 
     contentItem: CusText {
         id: labelText
+        text: root.text
+        font: root.font
+        opacity: enabled ? 1.0 : 0.3
+        horizontalAlignment: Text.AlignHCenter
+        verticalAlignment: Text.AlignVCenter
+        elide: Text.ElideRigh
     }
 }

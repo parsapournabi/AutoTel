@@ -4,6 +4,7 @@
         <file>qml/MainWindow.qml</file>
         <file>qml/GlobalContext.qml</file>
         <file>qml/CusButton.qml</file>
+        <file>qml/CusText.qml</file>
         <file>qml/Pane.qml</file>
     </qresource>
 </RCC>

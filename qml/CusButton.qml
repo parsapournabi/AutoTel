@@ -6,13 +6,16 @@ Q.Button {
 
     property alias labelText: labelText
     property alias backgroundPane: bgPane
+
     implicitWidth: 120
     implicitHeight: 40
+    hoverEnabled: true
 
     background: Pane {
         id: bgPane
         implicitWidth: 100
         implicitHeight: 30
+        level: pressed ? 2 : hovered ? 1 : 0
     }
 
     contentItem: CusText {

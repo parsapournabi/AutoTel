@@ -84,3 +84,7 @@ CMakeLists.txt.user*
 /.qtcreator/
 .idea/
 venv/
+
+# Custom
+
+src/meta/resources_rc.py

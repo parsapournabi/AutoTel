@@ -3,8 +3,8 @@ import QtQuick 2.12
 QtObject {
     id: root
 
-    property var backgroundColor: ["#202020"]
-    property var paneBackgroundColor: ["#202020"]
+    property var backgroundColor: ["#202020", "#404040", "black"]
+    property var paneBackgroundColor: ["#202020", "#404040", "black"]
     property var paneBorderColor: darker(paneBackgroundColor, 1.75)
 
     property var textColor: ["white"]

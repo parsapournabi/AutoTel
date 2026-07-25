@@ -1,5 +1,7 @@
 # This Python file uses the following encoding: utf-8
 from src.cusqt.custom_widgets import QApplication
+from src.main import Main
+
 from PyQt5.QtQml import QQmlApplicationEngine
 from PyQt5.QtWidgets import QSystemTrayIcon
 from PyQt5.QtGui import QFontDatabase
@@ -54,6 +56,11 @@ if __name__ == "__main__":
         app.setQuitOnLastWindowClosed(False)
 
     engine = QQmlApplicationEngine()
+
+    # Context Properties
+    _main = Main()
+    engine.rootContext().setContextProperty("_main", _main)
+
     engine.load("qrc:/qml/main.qml")
     if not engine.rootObjects():
         sys.exit(-1)

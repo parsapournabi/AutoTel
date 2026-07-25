@@ -14,3 +14,18 @@ class ConnectionState(IntEnum):
     NO_PROXY = auto()
     DISCONNECTED = auto()
     CONNECTED = auto()
+
+
+class SessionState(IntEnum):
+    """
+    Telegram Session state using self DataBase (sqlite)
+
+    CHECK_SESSION: fetching session from TABLE .
+    NO_SESSION: after fetch if it is empty.
+    CREATE_SESSION: if no session it should be recreate.
+    SESSION_EXISTS: while checking if session exists
+    """
+    CHECK_SESSION = auto()
+    NO_SESSION = auto()
+    CREATE_SESSION = auto()
+    SESSION_EXISTS = auto()

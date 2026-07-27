@@ -4,7 +4,7 @@ import hashlib
 import os
 import inspect
 
-from global_logic import iter_files
+from src.utils.global_logic import iter_files
 
 
 @dataclass(slots=True, frozen=True)
@@ -72,6 +72,4 @@ class FileManager(QObject):
 
 if __name__ == '__main__':
     fmng = FileManager()
-    fmng.has_new_files()
-    print(FileManager.compare_files(["Parsa"], [FileInfo("", "Parsa"), FileInfo("", "Ali"), FileInfo("", "Abbas"),
-                                                FileInfo("", "Hello")]))
+    print(FileManager.compare_files(["Parsa"], [FileInfo("", "Parsa")]))

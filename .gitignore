@@ -88,3 +88,4 @@ venv/
 # Custom
 
 src/meta/resources_rc.py
+.env

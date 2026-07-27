@@ -1,7 +1,16 @@
 from PyQt5.QtCore import QObject, pyqtProperty, pyqtSignal
-from global_logic import iter_files
+from dataclasses import dataclass
+import hashlib
 import os
 import inspect
+
+from global_logic import iter_files
+
+
+@dataclass(slots=True, frozen=True)
+class FileInfo:
+    path: str
+    hash: str
 
 
 class FileManager(QObject):
@@ -12,6 +21,14 @@ class FileManager(QObject):
         super(FileManager, self).__init__(parent=parent)
 
     # Public methods
+    @staticmethod
+    def file_hash(path: str) -> str:
+        h = hashlib.sha256()
+        with open(path, "rb") as f:
+            while chunk := f.read(1024 * 1024):
+                h.update(chunk)
+        return h.hexdigest()
+
     def has_new_files(self, path="") -> bool:
         _path = path or self._targetPath
         if not _path:

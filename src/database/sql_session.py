@@ -53,7 +53,7 @@ class DataBase:
         try:
             QUERY = "SELECT phone FROM tel_session;"
             self._cursor.execute(QUERY)
-            return self._cursor.fetchall()
+            return list(map(lambda x: x[0], self._cursor.fetchall()))
         except Exception as ex:
             print(f"Exception {self.__class__.__name__}.{inspect.currentframe().f_code.co_name}\n{ex}")
 

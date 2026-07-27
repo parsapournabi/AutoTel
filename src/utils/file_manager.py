@@ -29,7 +29,7 @@ class FileManager(QObject):
                 h.update(chunk)
         return h.hexdigest()
 
-    def get_current_files(self, path: str) -> list[FileInfo]:
+    def get_current_files(self, path: str = "") -> list[FileInfo]:
         try:
             path = path or self._targetPath
             if not os.path.exists(path):

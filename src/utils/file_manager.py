@@ -29,23 +29,33 @@ class FileManager(QObject):
                 h.update(chunk)
         return h.hexdigest()
 
-    def has_new_files(self, path="") -> bool:
-        _path = path or self._targetPath
-        if not _path:
-            print("Path is empty: ", path, self._targetPath)
-            return False
+    def get_current_files(self, path: str) -> list[FileInfo]:
+        try:
+            path = path or self._targetPath
+            if not os.path.exists(path):
+                print("Target path isn't exists!", path)
+                return []
+            if not os.path.isdir(path):
+                print("Target path isn't directory", path)
+                return []
+            return [FileInfo(path=file, hash=self.file_hash(file)) for file in iter_files(path)]
 
-        files = self._get_current_files(_path)
-        if not files:
-            # target path has no such any files
-            return False
+        except Exception as ex:
+            print(f"Exception {self.__class__.__name__}.{inspect.currentframe().f_code.co_name}\n{ex}")
+        return []
 
-        if self._is_files_are_new(files):
-            return True
-        return False
+    @staticmethod
+    def compare_files(oldFiles: list[str], newFiles: list[FileInfo]) -> list[FileInfo]:
+        """
+        Comparing oldFiles hash with newFiles hash then return the non-existing files by FileInfo
+        :param oldFiles: a list of the oldFiles hash
+        :param newFiles: a list of current existing files by FileInfo
+        :return: non-existing files by FileInfo
+        """
+        oldHash = set(oldFiles)
+        return list(filter(lambda file: file.hash not in oldHash, newFiles))
 
     # Properties
-
     @pyqtProperty(str)
     def targetPath(self) -> str:
         return self._targetPath
@@ -59,24 +69,9 @@ class FileManager(QObject):
 
     # Protected & Private methods
 
-    def _get_current_files(self, path: str) -> list:
-        try:
-            if not os.path.exists(path):
-                print("Target path isn't exists!", path)
-                return []
-            if not os.path.isdir(path):
-                print("Target path isn't directory", path)
-                return []
-            return list(iter_files(path))
-
-        except Exception as ex:
-            print(f"Exception {self.__class__.__name__}.{inspect.currentframe().f_code.co_name}\n{ex}")
-        return []
-
-    def _is_files_are_new(self, files: list) -> bool:
-        pass
-
 
 if __name__ == '__main__':
     fmng = FileManager()
     fmng.has_new_files()
+    print(FileManager.compare_files(["Parsa"], [FileInfo("", "Parsa"), FileInfo("", "Ali"), FileInfo("", "Abbas"),
+                                                FileInfo("", "Hello")]))

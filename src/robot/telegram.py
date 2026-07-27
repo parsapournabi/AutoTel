@@ -2,11 +2,10 @@ import io
 import argparse
 import asyncio
 import getpass
-import os
 import logging
 import traceback
 from datetime import datetime, timezone
-from src.robot.flatlay import traceback_email_flatlay
+import inspect
 
 from telethon import TelegramClient
 from telethon.errors import (
@@ -18,58 +17,18 @@ from telethon.errors import (
 )
 
 from telethon.tl.functions.contacts import GetContactsRequest
-from telethon.errors import UserNotParticipantError, FloodWaitError, ChannelPrivateError
+from telethon.errors import UserNotParticipantError, FloodWaitError, ChannelPrivateError, RPCError, AuthKeyError
 from telethon.tl.functions.channels import GetParticipantRequest
-from telethon.tl.types import ChannelParticipantAdmin, ChannelParticipantCreator, Chat, Channel, Message
 from telethon.tl.functions.contacts import ResolveUsernameRequest
 from time import sleep
 from urllib.request import getproxies
 import base64
-import requests
 import json
 from io import BytesIO
 import mimetypes
 import time
 
-
-# Decorators..
-def retry(func):
-    def wrapper(*args, **kwargs):
-        i = 0
-        retries = 3
-        while i < retries:
-            try:
-                ret = func(*args, **kwargs)
-                return ret
-            except Exception as e:
-                print(f'You have and Exception at requesting to {func} {e}')
-                traceback.print_exc()
-                i += 1
-                sleep(0.001)
-        return False
-
-    return wrapper
-
-
-# methods
-@retry
-def upload_image(blob):
-    """uploading those profile images that will be expire"""
-    url = 'http://18.215.217.156:2021/uploadB64'
-    base64_data = base64.b64encode(blob)
-
-    # create the data URI
-    data_uri = f"data:image/png;base64,{base64_data.decode('utf-8')}"
-    body = {'data': data_uri}
-    print(body)
-    try:
-        res = requests.post(url, json=body, timeout=10)
-        res.raise_for_status()  # Raise an HTTPError for bad responses (4xx and 5xx)
-        return json.loads(res.text)
-    except requests.RequestException as e:
-        logger.error(f"Failed to upload image: {e}")
-        return None
-
+from src.utils.utils import AuthState
 
 # Configure logging
 logging.basicConfig(
@@ -113,8 +72,7 @@ class Telegram:
             return profile_photo_stream.read()
 
         except Exception as ex:
-            traceback_email_flatlay(
-                body=f'We have an Exception on Telegram_get_profile_blob')
+            print(f"Exception {self.__class__.__name__}.{inspect.currentframe().f_code.co_name}\n{ex}")
             return b''
 
     async def handle_2fa(self, password: str) -> str:
@@ -136,14 +94,41 @@ class Telegram:
                 await asyncio.sleep(e.seconds)
             except Exception as e:
                 logger.error(f"Error sending code: {str(e)}")
-                traceback_email_flatlay(
-                    body=f'Error sending Telegram code: {e}')
+                print(f"Exception {self.__class__.__name__}.{inspect.currentframe().f_code.co_name}\n{e}")
                 if attempt < self.max_attempts - 1:
                     logger.info("Retrying...")
                 else:
                     raise
 
         raise Exception("Maximum attempts reached for phone code verification")
+
+    async def upload_file_to_me(self, file_path: str) -> bool:
+        try:
+            await self.client.send_file("me", file_path, caption="Backup file")
+            return True
+
+        except FloodWaitError as e:
+            print(f"Telegram rate limit. Wait {e.seconds} seconds.")
+
+        except AuthKeyError:
+            print("Session is invalid. Login again.")
+
+        except RPCError as e:
+            print(f"Telegram RPC Error: {e}")
+
+        except FileNotFoundError as e:
+            print(f"File not found: {e}")
+
+        except PermissionError as e:
+            print(f"Permission denied: {e}")
+
+        except OSError as e:
+            print(f"OS Error: {e}")
+
+        except Exception:
+            import traceback
+            traceback.print_exc()
+        return False
 
     async def connect(self, phone_number: str, code: str = None, password: str = None):
         """Attempt to connect to Telegram with a maximum of 3 attempts."""
@@ -157,7 +142,7 @@ class Telegram:
                             # print(ret)
                             # print(self._phone_code_hash.phone_code_hash)
                             # code = input('Please insert code: ')
-                            return 'code'
+                            return AuthState.AUTH_SEC_CODE
 
                     # code = await self.handle_phone_code(phone_number)
 
@@ -165,29 +150,36 @@ class Telegram:
                         await self.client.sign_in(phone=phone_number, code=code)
                     except PhoneCodeInvalidError:
                         logger.error("Invalid verification code. Please try again.")
-                        return {'title': 'Error', 'message': 'Invalid verification code. Please try again.'}
+                        # return {'title': 'Error', 'message': 'Invalid verification code. Please try again.'}
+                        return AuthState.AUTH_FAILED
 
                 if await self.client.is_user_authorized():
                     logger.info("Successfully connected to Telegram")
                     self.isLoggedIn = True
-                    return True
+                    # return True
+                    return AuthState.AUTH_SUCCESS
 
             except SessionPasswordNeededError:
                 if not password:
-                    return '2FA'
+                    # return '2FA'
+                    return AuthState.AUTH_2FA
+
                 # password = await self.handle_2fa(password)
                 await self.client.sign_in(password=password)
                 logger.info("2FA authentication successful")
                 self.isLoggedIn = True
-                return True
+                # return True
+                return AuthState.AUTH_SUCCESS
             except Exception as e:
                 logger.error(f"Attempt {attempt + 1} failed: {str(e)}")
                 traceback.print_exc()
                 if attempt >= self.max_attempts - 1:
                     logger.error("Maximum connection attempts reached.")
-                    return {'title': 'Error', 'message': 'Maximum connection attempts reached.'}
+                    # return {'title': 'Error', 'message': 'Maximum connection attempts reached.'}
+                    return AuthState.AUTH_FAILED
 
-        return False
+        # return False
+        return AuthState.AUTH_FAILED
 
     async def disconnect(self):
         """Properly close the Telegram client and delete session file."""
@@ -217,8 +209,6 @@ class Telegram:
                 self.profile_pic = b''
 
         except Exception as e:
-            traceback_email_flatlay(
-                body=f'Error fetching Telegram profile info: {str(e)}')
             logger.error(f"Error fetching profile info: {str(e)}")
 
     async def export_contacts(self) -> list:
@@ -231,7 +221,8 @@ class Telegram:
                 # Getting user profile binary photo
                 blob = await self._get_profile_blob(user)
                 # Uploading to aws server for showing user profile pic on front
-                url = upload_image(blob)
+                # url = upload_image(blob)
+                url = ""
 
                 time_now = datetime.now()
                 updated_at = int(datetime.timestamp(time_now) * 1000)
@@ -335,224 +326,224 @@ class Telegram:
             logger.error(f"Failed to get ID for {group_username}: {e}")
         return None
 
-    async def check_groups_permissions(self, dialogs):
-        """
-        Check if the user can send media in each group or channel.
-        """
-
-        for dialog in dialogs[:200]:
-            entity = dialog.entity
-
-            # Process only groups or channels
-            if isinstance(entity, (Channel, Chat)):
-                try:
-                    entity_id = entity.id if hasattr(entity, "id") else None
-
-                    if entity_id is None and hasattr(entity, "username") and entity.username:
-                        entity_id = await self.get_private_group_id(entity.username)
-
-                    # Skip broadcast channels where only admins can post
-                    if isinstance(entity, Channel) and entity.broadcast:
-                        logger.info(f"Skipping broadcast channel: {entity.title}")
-                        continue
-
-                    # Check if group has username...
-                    group_username = str(entity_id)
-                    if has_username := (hasattr(entity, "username") and entity.username):
-                        group_username = entity.username
-                    # Check permissions
-                    time_now = datetime.now()
-                    updated_at = int(datetime.timestamp(time_now) * 1000)
-                    group_info = {
-                        "url": f"https://t.me/{group_username}" if has_username else None,
-                        "updated_at": updated_at,
-                        "platform": "TELEGRAM",
-                        "platform_username": group_username,
-                        "full_name": entity.title,
-                        "platform_account_type": "GROUP",
-                        "external_id": entity_id
-                    }
-
-                    if entity.admin_rights and entity.admin_rights.post_messages:
-                        # User is an admin with post message rights
-                        self.sendable_chats.append(group_info)
-                        logger.info(f"You can send media in (Admin Rights): {entity.title}")
-                    elif hasattr(entity, "restriction_reason") and entity.restriction_reason:
-                        # The channel/group has posting restrictions
-                        logger.info(f"Cannot send media in (Restricted): {entity.title}")
-                    else:
-                        # No restrictions, assumed sendable
-                        self.sendable_chats.append(group_info)
-                        logger.info(f"You can send media in: {entity.title}")
-
-                except Exception as e:
-                    logger.error(f"Error while checking {entity.title}: {str(e)}")
-        return self.sendable_chats
-
-    async def check_channels_permissions(self, dialogs):
-        """
-        Check all channels (including broadcast) where the user can post media.
-        """
-        postable_channels = []  # List to store channels where posting is allowed
-
-        for dialog in dialogs[:200]:
-            entity = dialog.entity
-
-            # Process only channels
-            if isinstance(entity, Channel):
-                try:
-
-                    entity_id = entity.id if hasattr(entity, "id") else None
-
-                    if entity_id is None and hasattr(entity, "username") and entity.username:
-                        entity_id = await self.get_private_group_id(entity.username)
-
-                    # Fetch participant details to verify permissions
-                    participant = await self.client(GetParticipantRequest(entity.id, 'me'))
-
-                    time_now = datetime.now()
-                    updated_at = int(datetime.timestamp(time_now) * 1000)
-                    # Prepare the channel info dictionary
-                    channel_info = {
-                        "url": f"https://t.me/{entity.username}",
-                        "updated_at": updated_at,
-                        "platform": "TELEGRAM",
-                        "platform_username": entity.username or str(entity.id),
-                        "full_name": entity.title,
-                        "platform_account_type": "CHANNEL",
-                        "external_id": entity_id
-                    }
-
-                    # Check if the user is an admin (or creator) with post permissions
-                    if isinstance(participant.participant, (ChannelParticipantAdmin, ChannelParticipantCreator)):
-                        postable_channels.append(channel_info)
-                        logger.info(f"You can post media in (Admin Rights): {entity.title}")
-
-                except UserNotParticipantError:
-                    logger.warning(f"You are not a member of: {entity.title}")
-                except ChannelPrivateError:
-                    logger.warning(f"The channel {entity.title} is private.")
-                except Exception as e:
-                    logger.error(f"Error while checking channel {entity.title}: {str(e)}")
-
-        self.sendable_chats.extend(postable_channels)
-        return postable_channels
-
-    async def export_groups(self):
-        """Export Telegram groups (name, id, and link) to a CSV file, handling pagination and rate limits."""
-        try:
-            self.sendable_chats = []
-            dialogs = await self.client.get_dialogs()
-            await self.check_groups_permissions(dialogs)
-            await self.check_channels_permissions(dialogs)
-
-            return self.sendable_chats
-
-        except Exception as e:
-            logger.error(f"Error exporting groups and channels: {str(e)}")
-            raise e
-
-    def fetch_media(self, media_url: str):
-        """Fetch media from a URL with improved filename handling."""
-        logger.info(f"Fetching media from: {media_url}")
-        response = requests.get(media_url,
-                                proxies={'http': getproxies().get('http'),
-                                         'https': getproxies().get('http')},
-                                stream=True)
-        if response.status_code != 200:
-            logger.error(f"Failed to fetch media: {response.status_code}")
-            raise ValueError("Failed to fetch media.")
-
-        logger.debug("Media fetched successfully.")
-        media_stream = BytesIO(response.content)
-
-        # Handle content type
-        content_type = response.headers.get('content-type')
-
-        # Generate a default filename with proper extension
-        extension = mimetypes.guess_extension(content_type) if content_type else '.jpg'
-        if not extension:
-            extension = '.jpg'  # Fallback extension for images
-
-        default_filename = f"media{extension}"
-
-        # Try to get filename from URL, fallback to default if none found
-        file_name = media_url.split("/")[-1]
-        if not file_name or not '.' in file_name:
-            file_name = default_filename
-
-        logger.debug(f"Using file name: {file_name} with content type: {content_type}")
-        return media_stream, file_name, content_type
-
-    def infer_and_generate_file_name(self, file_name: str, content_type: str = None) -> str:
-        """Generate a unique file name with improved extension handling."""
-        if not file_name:
-            logger.error("File name is None or empty.")
-            extension = mimetypes.guess_extension(content_type) if content_type else '.jpg'
-            file_name = f"media{extension}"
-
-        # Ensure we have an extension
-        if '.' not in file_name:
-            extension = mimetypes.guess_extension(content_type) if content_type else '.jpg'
-            file_name = f"{file_name}{extension}"
-
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        name, ext = file_name.rsplit('.', 1)
-        return f"{name}_{timestamp}.{ext}"
-
-    def parse_schedule_time(self, schedule_time: str) -> int:
-        """Parse and validate the schedule time in ISO 8601 format."""
-        try:
-            # Using fromisoformat for ISO 8601 parsing
-            dt = datetime.fromisoformat(schedule_time.replace('Z', '+00:00'))  # Adjust for UTC if Z is present
-            if dt.tzinfo is None:
-                dt = dt.replace(tzinfo=timezone.utc)  # Set UTC if no timezone provided
-            return int(dt.timestamp())
-        except ValueError as e:
-            logger.error(f"Invalid ISO 8601 schedule_time format: {schedule_time}")
-            raise ValueError(f"Invalid schedule_time format: {e}")
-
-    def validate_future_time(self, schedule_timestamp: int):
-        """Ensure the schedule timestamp is in the future.
-
-        Args:
-            schedule_timestamp: The Unix timestamp to validate.
-
-        Raises:
-            ValueError: If the schedule time is not in the future.
-        """
-        current_timestamp = int(time.time())
-        if schedule_timestamp <= current_timestamp:
-            logger.error(f"schedule_time is not in the future: {schedule_timestamp}")
-            traceback_email_flatlay(
-                body=f"schedule_time is not in the future: {schedule_timestamp}")
-            raise ValueError("Schedule time must be in the future.")
-
-    async def schedule_media_message(self, chat_id, media_stream, schedule_timestamp, caption, isScheduled):
-        """Send the media with scheduling.
-
-        Args:
-            client: The Telegram client instance.
-            chat_id: ID of the chat where the media should be sent.
-            media_stream: The media stream to send.
-            schedule_timestamp: The Unix timestamp for scheduling the message.
-            caption: Optional caption for the media.
-        """
-        logger.debug(f"Calling send_file with schedule_date: {schedule_timestamp}")
-        if isScheduled:
-            await self.client.send_file(
-                chat_id,
-                file=media_stream,
-                caption=caption,
-                schedule=schedule_timestamp
-            )
-        else:
-            await self.client.send_file(
-                chat_id,
-                file=media_stream,
-                caption=caption,
-            )
-
+    # async def check_groups_permissions(self, dialogs):
+    #     """
+    #     Check if the user can send media in each group or channel.
+    #     """
+    #
+    #     for dialog in dialogs[:200]:
+    #         entity = dialog.entity
+    #
+    #         # Process only groups or channels
+    #         if isinstance(entity, (Channel, Chat)):
+    #             try:
+    #                 entity_id = entity.id if hasattr(entity, "id") else None
+    #
+    #                 if entity_id is None and hasattr(entity, "username") and entity.username:
+    #                     entity_id = await self.get_private_group_id(entity.username)
+    #
+    #                 # Skip broadcast channels where only admins can post
+    #                 if isinstance(entity, Channel) and entity.broadcast:
+    #                     logger.info(f"Skipping broadcast channel: {entity.title}")
+    #                     continue
+    #
+    #                 # Check if group has username...
+    #                 group_username = str(entity_id)
+    #                 if has_username := (hasattr(entity, "username") and entity.username):
+    #                     group_username = entity.username
+    #                 # Check permissions
+    #                 time_now = datetime.now()
+    #                 updated_at = int(datetime.timestamp(time_now) * 1000)
+    #                 group_info = {
+    #                     "url": f"https://t.me/{group_username}" if has_username else None,
+    #                     "updated_at": updated_at,
+    #                     "platform": "TELEGRAM",
+    #                     "platform_username": group_username,
+    #                     "full_name": entity.title,
+    #                     "platform_account_type": "GROUP",
+    #                     "external_id": entity_id
+    #                 }
+    #
+    #                 if entity.admin_rights and entity.admin_rights.post_messages:
+    #                     # User is an admin with post message rights
+    #                     self.sendable_chats.append(group_info)
+    #                     logger.info(f"You can send media in (Admin Rights): {entity.title}")
+    #                 elif hasattr(entity, "restriction_reason") and entity.restriction_reason:
+    #                     # The channel/group has posting restrictions
+    #                     logger.info(f"Cannot send media in (Restricted): {entity.title}")
+    #                 else:
+    #                     # No restrictions, assumed sendable
+    #                     self.sendable_chats.append(group_info)
+    #                     logger.info(f"You can send media in: {entity.title}")
+    #
+    #             except Exception as e:
+    #                 logger.error(f"Error while checking {entity.title}: {str(e)}")
+    #     return self.sendable_chats
+    #
+    # async def check_channels_permissions(self, dialogs):
+    #     """
+    #     Check all channels (including broadcast) where the user can post media.
+    #     """
+    #     postable_channels = []  # List to store channels where posting is allowed
+    #
+    #     for dialog in dialogs[:200]:
+    #         entity = dialog.entity
+    #
+    #         # Process only channels
+    #         if isinstance(entity, Channel):
+    #             try:
+    #
+    #                 entity_id = entity.id if hasattr(entity, "id") else None
+    #
+    #                 if entity_id is None and hasattr(entity, "username") and entity.username:
+    #                     entity_id = await self.get_private_group_id(entity.username)
+    #
+    #                 # Fetch participant details to verify permissions
+    #                 participant = await self.client(GetParticipantRequest(entity.id, 'me'))
+    #
+    #                 time_now = datetime.now()
+    #                 updated_at = int(datetime.timestamp(time_now) * 1000)
+    #                 # Prepare the channel info dictionary
+    #                 channel_info = {
+    #                     "url": f"https://t.me/{entity.username}",
+    #                     "updated_at": updated_at,
+    #                     "platform": "TELEGRAM",
+    #                     "platform_username": entity.username or str(entity.id),
+    #                     "full_name": entity.title,
+    #                     "platform_account_type": "CHANNEL",
+    #                     "external_id": entity_id
+    #                 }
+    #
+    #                 # Check if the user is an admin (or creator) with post permissions
+    #                 if isinstance(participant.participant, (ChannelParticipantAdmin, ChannelParticipantCreator)):
+    #                     postable_channels.append(channel_info)
+    #                     logger.info(f"You can post media in (Admin Rights): {entity.title}")
+    #
+    #             except UserNotParticipantError:
+    #                 logger.warning(f"You are not a member of: {entity.title}")
+    #             except ChannelPrivateError:
+    #                 logger.warning(f"The channel {entity.title} is private.")
+    #             except Exception as e:
+    #                 logger.error(f"Error while checking channel {entity.title}: {str(e)}")
+    #
+    #     self.sendable_chats.extend(postable_channels)
+    #     return postable_channels
+    #
+    # async def export_groups(self):
+    #     """Export Telegram groups (name, id, and link) to a CSV file, handling pagination and rate limits."""
+    #     try:
+    #         self.sendable_chats = []
+    #         dialogs = await self.client.get_dialogs()
+    #         await self.check_groups_permissions(dialogs)
+    #         await self.check_channels_permissions(dialogs)
+    #
+    #         return self.sendable_chats
+    #
+    #     except Exception as e:
+    #         logger.error(f"Error exporting groups and channels: {str(e)}")
+    #         raise e
+    #
+    # def fetch_media(self, media_url: str):
+    #     """Fetch media from a URL with improved filename handling."""
+    #     logger.info(f"Fetching media from: {media_url}")
+    #     response = requests.get(media_url,
+    #                             proxies={'http': getproxies().get('http'),
+    #                                      'https': getproxies().get('http')},
+    #                             stream=True)
+    #     if response.status_code != 200:
+    #         logger.error(f"Failed to fetch media: {response.status_code}")
+    #         raise ValueError("Failed to fetch media.")
+    #
+    #     logger.debug("Media fetched successfully.")
+    #     media_stream = BytesIO(response.content)
+    #
+    #     # Handle content type
+    #     content_type = response.headers.get('content-type')
+    #
+    #     # Generate a default filename with proper extension
+    #     extension = mimetypes.guess_extension(content_type) if content_type else '.jpg'
+    #     if not extension:
+    #         extension = '.jpg'  # Fallback extension for images
+    #
+    #     default_filename = f"media{extension}"
+    #
+    #     # Try to get filename from URL, fallback to default if none found
+    #     file_name = media_url.split("/")[-1]
+    #     if not file_name or not '.' in file_name:
+    #         file_name = default_filename
+    #
+    #     logger.debug(f"Using file name: {file_name} with content type: {content_type}")
+    #     return media_stream, file_name, content_type
+    #
+    # def infer_and_generate_file_name(self, file_name: str, content_type: str = None) -> str:
+    #     """Generate a unique file name with improved extension handling."""
+    #     if not file_name:
+    #         logger.error("File name is None or empty.")
+    #         extension = mimetypes.guess_extension(content_type) if content_type else '.jpg'
+    #         file_name = f"media{extension}"
+    #
+    #     # Ensure we have an extension
+    #     if '.' not in file_name:
+    #         extension = mimetypes.guess_extension(content_type) if content_type else '.jpg'
+    #         file_name = f"{file_name}{extension}"
+    #
+    #     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    #     name, ext = file_name.rsplit('.', 1)
+    #     return f"{name}_{timestamp}.{ext}"
+    #
+    # def parse_schedule_time(self, schedule_time: str) -> int:
+    #     """Parse and validate the schedule time in ISO 8601 format."""
+    #     try:
+    #         # Using fromisoformat for ISO 8601 parsing
+    #         dt = datetime.fromisoformat(schedule_time.replace('Z', '+00:00'))  # Adjust for UTC if Z is present
+    #         if dt.tzinfo is None:
+    #             dt = dt.replace(tzinfo=timezone.utc)  # Set UTC if no timezone provided
+    #         return int(dt.timestamp())
+    #     except ValueError as e:
+    #         logger.error(f"Invalid ISO 8601 schedule_time format: {schedule_time}")
+    #         raise ValueError(f"Invalid schedule_time format: {e}")
+    #
+    # def validate_future_time(self, schedule_timestamp: int):
+    #     """Ensure the schedule timestamp is in the future.
+    #
+    #     Args:
+    #         schedule_timestamp: The Unix timestamp to validate.
+    #
+    #     Raises:
+    #         ValueError: If the schedule time is not in the future.
+    #     """
+    #     current_timestamp = int(time.time())
+    #     if schedule_timestamp <= current_timestamp:
+    #         logger.error(f"schedule_time is not in the future: {schedule_timestamp}")
+    #         traceback_email_flatlay(
+    #             body=f"schedule_time is not in the future: {schedule_timestamp}")
+    #         raise ValueError("Schedule time must be in the future.")
+    #
+    # async def schedule_media_message(self, chat_id, media_stream, schedule_timestamp, caption, isScheduled):
+    #     """Send the media with scheduling.
+    #
+    #     Args:
+    #         client: The Telegram client instance.
+    #         chat_id: ID of the chat where the media should be sent.
+    #         media_stream: The media stream to send.
+    #         schedule_timestamp: The Unix timestamp for scheduling the message.
+    #         caption: Optional caption for the media.
+    #     """
+    #     logger.debug(f"Calling send_file with schedule_date: {schedule_timestamp}")
+    #     if isScheduled:
+    #         await self.client.send_file(
+    #             chat_id,
+    #             file=media_stream,
+    #             caption=caption,
+    #             schedule=schedule_timestamp
+    #         )
+    #     else:
+    #         await self.client.send_file(
+    #             chat_id,
+    #             file=media_stream,
+    #             caption=caption,
+    #         )
+    #
     async def send_message_post(self, chat_id, schedule_time: str, isScheduled=True, caption=None):
         """Send the media with scheduling."""
         try:
@@ -570,8 +561,6 @@ class Telegram:
                 )
         except Exception as e:
             logger.error(f"Failed to send message post: {e}")
-            traceback_email_flatlay(
-                body=f"Failed to send message post: {e}")
 
     async def send_media_post(self, chat_id, media_url, schedule_time: str, isScheduled=True, caption=None):
         """
@@ -609,112 +598,111 @@ class Telegram:
 
             logger.info(f"Media scheduled successfully to chat ID {chat_id} at {schedule_time}.")
         except Exception as e:
-            traceback_email_flatlay(
-                body=f'Error in Telegram.send_scheduled_post: {str(e)}')
             logger.error(f"Error in send_scheduled_post: {str(e)}")
 
-    async def send_group_media_post(self, chat_id, media_urls, schedule_time: str = None,
-                                    isScheduled: bool = True, caption: str = None):
-        """
-        Send media files (images or videos) from URLs directly to Telegram without saving locally.
+    # async def send_group_media_post(self, chat_id, media_urls, schedule_time: str = None,
+    #                                 isScheduled: bool = True, caption: str = None):
+    #     """
+    #     Send media files (images or videos) from URLs directly to Telegram without saving locally.
+    #
+    #     Args:
+    #         client: The Telethon client instance.
+    #         chat_id: The chat ID where the media should be sent.
+    #         media_urls: List of media URLs to send.
+    #         caption: Optional caption for the media.
+    #     """
+    #     try:
+    #         logger.info(f"Preparing to send media to chat ID {chat_id}.")
+    #         media_files = []
+    #
+    #         schedule_timestamp = None
+    #         if isScheduled and schedule_time:
+    #             try:
+    #                 schedule_timestamp = int(datetime.fromisoformat(
+    #                     schedule_time.replace("Z", "+00:00")).timestamp())
+    #             except ValueError as e:
+    #                 raise ValueError(f"Invalid schedule_time format: {e}")
+    #
+    #         for idx, media_url in enumerate(media_urls):
+    #             try:
+    #                 # Fetch the media from the URL
+    #                 logger.info(f"Fetching media from URL: {media_url}")
+    #                 response = requests.get(media_url, stream=True)
+    #                 if response.status_code != 200:
+    #                     logger.warning(f"Failed to fetch media from {media_url}, status code: {response.status_code}")
+    #                     continue
+    #
+    #                 # Extract content type
+    #                 content_type = response.headers.get('Content-Type')
+    #                 logger.debug(f"Content type of media: {content_type}")
+    #
+    #                 # Guess file extension based on content type
+    #                 extension = mimetypes.guess_extension(content_type) or '.dat'
+    #                 unique_id = datetime.now().strftime("%Y%m%d_%H%M%S%f")  # Unique timestamp up to microseconds
+    #                 file_name = f"flatlay_{unique_id}{extension}"
+    #
+    #                 # Wrap the media content in BytesIO
+    #                 media_stream = BytesIO(response.content)
+    #                 media_stream.name = file_name  # Required by Telethon
+    #
+    #                 # Append to the list of media files
+    #                 media_files.append(
+    #                     {"file": media_stream, "caption": caption if idx == 0 else None})
+    #                 logger.info(f"Media from {media_url} prepared successfully.")
+    #             except Exception as e:
+    #                 logger.error(f"Error processing URL {media_url}: {e}")
+    #
+    #         if not media_files:
+    #             raise ValueError("No valid media files to send.")
+    #
+    #         # Send media group to Telegram
+    #         logger.info(f"Sending {len(media_files)} media files to chat ID {chat_id}.")
+    #         await self.client.send_file(
+    #             entity=chat_id,
+    #             file=[media["file"] for media in media_files],
+    #             caption=[caption] if caption else None,
+    #             schedule=schedule_timestamp if isScheduled else None
+    #         )
+    #         logger.info(f"Media sent successfully to chat ID {chat_id}.")
+    #     except Exception as e:
+    #         logger.error(f"Error in send_group_media_post: {str(e)}")
+    #         raise
 
-        Args:
-            client: The Telethon client instance.
-            chat_id: The chat ID where the media should be sent.
-            media_urls: List of media URLs to send.
-            caption: Optional caption for the media.
-        """
-        try:
-            logger.info(f"Preparing to send media to chat ID {chat_id}.")
-            media_files = []
-
-            schedule_timestamp = None
-            if isScheduled and schedule_time:
-                try:
-                    schedule_timestamp = int(datetime.fromisoformat(
-                        schedule_time.replace("Z", "+00:00")).timestamp())
-                except ValueError as e:
-                    raise ValueError(f"Invalid schedule_time format: {e}")
-
-            for idx, media_url in enumerate(media_urls):
-                try:
-                    # Fetch the media from the URL
-                    logger.info(f"Fetching media from URL: {media_url}")
-                    response = requests.get(media_url, stream=True)
-                    if response.status_code != 200:
-                        logger.warning(f"Failed to fetch media from {media_url}, status code: {response.status_code}")
-                        continue
-
-                    # Extract content type
-                    content_type = response.headers.get('Content-Type')
-                    logger.debug(f"Content type of media: {content_type}")
-
-                    # Guess file extension based on content type
-                    extension = mimetypes.guess_extension(content_type) or '.dat'
-                    unique_id = datetime.now().strftime("%Y%m%d_%H%M%S%f")  # Unique timestamp up to microseconds
-                    file_name = f"flatlay_{unique_id}{extension}"
-
-                    # Wrap the media content in BytesIO
-                    media_stream = BytesIO(response.content)
-                    media_stream.name = file_name  # Required by Telethon
-
-                    # Append to the list of media files
-                    media_files.append(
-                        {"file": media_stream, "caption": caption if idx == 0 else None})
-                    logger.info(f"Media from {media_url} prepared successfully.")
-                except Exception as e:
-                    logger.error(f"Error processing URL {media_url}: {e}")
-
-            if not media_files:
-                raise ValueError("No valid media files to send.")
-
-            # Send media group to Telegram
-            logger.info(f"Sending {len(media_files)} media files to chat ID {chat_id}.")
-            await self.client.send_file(
-                entity=chat_id,
-                file=[media["file"] for media in media_files],
-                caption=[caption] if caption else None,
-                schedule=schedule_timestamp if isScheduled else None
-            )
-            logger.info(f"Media sent successfully to chat ID {chat_id}.")
-        except Exception as e:
-            logger.error(f"Error in send_group_media_post: {str(e)}")
-            raise
-
-    async def process_direct_message(self, chat_id: int):
-        """
-        Args:
-            chat_id (int): The numeric Telegram ID of the user.
-        """
-        try:
-            messages = await self.client.get_messages(chat_id, limit=50)  # Fetch last 50 messages
-            messages.reverse()
-
-            result = []
-            outbound_found = False
-
-            for message in messages:
-                if isinstance(message, Message):
-                    message_data = {
-                        "body": message.text or "[MEDIA]",
-                        "type": "OUTBOUND" if message.out else "INBOUND",
-                        "timestamp": message.date.strftime("%Y-%m-%d %H:%M:%S")
-                    }
-
-                    if message.out:
-                        result = [message_data]
-                        outbound_found = True
-                    elif outbound_found:
-                        result.append(message_data)
-
-            if result and result[0]["type"] == "OUTBOUND" and len(result) == 1:
-                return []
-
-            return result
-
-        except Exception as e:
-            logger.error(f"Failed to fetch messages for user {chat_id}: {e}")
-            return []
+    # async def process_direct_message(self, chat_id: int):
+    #     """
+    #     Args:
+    #         chat_id (int): The numeric Telegram ID of the user.
+    #     """
+    #     try:
+    #         messages = await self.client.get_messages(chat_id, limit=50)  # Fetch last 50 messages
+    #         messages.reverse()
+    #
+    #         result = []
+    #         outbound_found = False
+    #
+    #         for message in messages:
+    #             if isinstance(message, Message):
+    #                 message_data = {
+    #                     "body": message.text or "[MEDIA]",
+    #                     "type": "OUTBOUND" if message.out else "INBOUND",
+    #                     "timestamp": message.date.strftime("%Y-%m-%d %H:%M:%S")
+    #                 }
+    #
+    #                 if message.out:
+    #                     result = [message_data]
+    #                     outbound_found = True
+    #                 elif outbound_found:
+    #                     result.append(message_data)
+    #
+    #         if result and result[0]["type"] == "OUTBOUND" and len(result) == 1:
+    #             return []
+    #
+    #         return result
+    #
+    #     except Exception as e:
+    #         logger.error(f"Failed to fetch messages for user {chat_id}: {e}")
+    #         return []
+    #
 
 
 async def main():

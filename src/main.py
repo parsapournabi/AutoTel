@@ -7,8 +7,12 @@ from src.utils.file_manager import FileManager, FileInfo
 from src.utils.network_manager import NetworkManager
 from src.robot.telegram import Telegram
 
+from dotenv import load_dotenv
 import asyncio
 import os
+
+# Loading Project environment
+load_dotenv()
 
 
 class Main(QObject):
@@ -42,8 +46,8 @@ class Main(QObject):
 
         telegram_session_path_windows: str = os.path.join(os.path.expanduser('~'), 'Documents/WeaTel_database.db')
         telegram_session_path_mac: str = os.path.join(os.path.expanduser('~'), 'WeaTel_database.db')
-        self.telegram: Telegram = Telegram(api_id='26655661',
-                                           api_hash='be70771578930b7180cf15f2f65a1028',
+        self.telegram: Telegram = Telegram(api_id=os.getenv("TEL_API_ID"),
+                                           api_hash=os.getenv("TEL_API_HASH"),
                                            session_name=telegram_session_path_windows if QApplication.os_platform == 'WINDOWS' else telegram_session_path_mac)
 
         self.available_files = []

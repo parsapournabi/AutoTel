@@ -28,6 +28,10 @@ Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
             text: "Login"
+            onClicked: {
+                console.log("CLICKING...");
+                _main.start();
+            }
         }
     }
 }

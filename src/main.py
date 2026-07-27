@@ -1,7 +1,7 @@
 from PyQt5.QtCore import QObject, QTimer, pyqtSlot
 
 from src.cusqt.custom_widgets import QApplication
-from src.utils.utils import ConnectionState, FileState, SessionState, ProcessState, AuthState
+from src.utils.utils import ConnectionState, SessionState, ProcessState, AuthState
 from src.database.sql_session import DataBase
 from src.utils.file_manager import FileManager, FileInfo
 from src.utils.network_manager import NetworkManager

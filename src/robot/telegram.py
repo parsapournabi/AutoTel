@@ -104,7 +104,8 @@ class Telegram:
 
     async def upload_file_to_me(self, file_path: str) -> bool:
         try:
-            await self.client.send_file("me", file_path, caption="Backup file")
+            await self.client.send_file("me", file_path)
+            # await self.client.send_file("me", file_path, caption="Backup file")
             return True
 
         except FloodWaitError as e:

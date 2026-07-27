@@ -1,6 +1,17 @@
 from enum import IntEnum, auto
 
 
+class FileState(IntEnum):
+    """
+    Before everything the specific path should be check for new files to upload
+
+    NO_SUCH_FILES: after an interval the  path should be recheck until the new files available
+    HAS_NEW_FILES: if any new file exists, the ConnectionState & SessionState should be in next role until the new files going to upload
+    """
+    NO_SUCH_FILES = auto()
+    HAS_NEW_FILES = auto()
+
+
 class ConnectionState(IntEnum):
     """
     Telegram ConnectionState flags

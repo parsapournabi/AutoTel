@@ -28,3 +28,20 @@ class NetworkManager:
         except Exception as ex:
             print(f"Exception {NetworkManager.__class__.__name__}.{inspect.currentframe().f_code.co_name}\n{ex}")
         return False
+
+    @staticmethod
+    def can_connect_telegram(timeout=3) -> bool:
+        """
+        :param timeout: unit per second
+        :return: bool --> if can connect to the telegram == True
+        """
+        try:
+            TELEGRAM_SERVER_HOST: str = "149.154.167.51"
+            TELEGRAM_SERVER_PORT: int = 443
+            socket.create_connection((TELEGRAM_SERVER_HOST, TELEGRAM_SERVER_PORT), timeout)
+            return True
+        except OSError:
+            pass
+        except Exception as ex:
+            print(f"Exception {NetworkManager.__class__.__name__}.{inspect.currentframe().f_code.co_name}\n{ex}")
+        return False

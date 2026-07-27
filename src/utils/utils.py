@@ -7,7 +7,7 @@ class ConnectionState(IntEnum):
 
     NO_NETWORK: if no WLAN or LAN is connected
     NO_PROXY: if Network is available but system proxy or tun mode is disabled
-    DISCONNECTED: if Network & Proxy is available but Telegram Login is required
+    DISCONNECTED: if Network & Proxy is available but Telegram Login is required (First check DataBase Session)
     CONNECTED: if everything is Ok and connected
     """
     NO_NETWORK = auto()

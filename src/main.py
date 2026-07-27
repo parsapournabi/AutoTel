@@ -5,35 +5,10 @@ from src.utils.utils import ConnectionState, FileState, SessionState, ProcessSta
 from src.database.sql_session import DataBase
 from src.utils.file_manager import FileManager, FileInfo
 from src.utils.network_manager import NetworkManager
+from src.robot.telegram import Telegram
 
-from random import randint as rnd
-from time import sleep
+import asyncio
 import os
-
-
-class Telegram:
-    def __init__(self):
-        pass
-
-    @staticmethod
-    def login(phone="", code="", two_fa=""):
-        print("Logging...", phone, code, two_fa)
-        sleep(rnd(3, 5))
-        res = rnd(0, 2)
-        print("Login result: ", res)
-        if res == 0:
-            return AuthState.AUTH_FAILED
-        elif res == 1:
-            return AuthState.AUTH_SEC_CODE
-        elif res == 2:
-            return AuthState.AUTH_SUCCESS
-
-    @staticmethod
-    def upload_file(file):
-        res = rnd(0, 1)
-        print("Uploading...", file, res)
-        sleep(rnd(1, 3))
-        return res
 
 
 class Main(QObject):
@@ -46,6 +21,7 @@ class Main(QObject):
     # API members
     db: DataBase
     file_manager: FileManager
+    telegram: Telegram
 
     # Public Members
     user_phone: str = ""
@@ -56,9 +32,19 @@ class Main(QObject):
     def __init__(self, parent=None):
         super(Main, self).__init__(parent)
 
+        # Async Event Loop
+        self.loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self.loop)
+
         # Members
         self.db = DataBase(QApplication.os_platform)
         self.file_manager = FileManager(self)
+
+        telegram_session_path_windows: str = os.path.join(os.path.expanduser('~'), 'Documents/WeaTel_database.db')
+        telegram_session_path_mac: str = os.path.join(os.path.expanduser('~'), 'WeaTel_database.db')
+        self.telegram: Telegram = Telegram(api_id='26655661',
+                                           api_hash='be70771578930b7180cf15f2f65a1028',
+                                           session_name=telegram_session_path_windows if QApplication.os_platform == 'WINDOWS' else telegram_session_path_mac)
 
         self.available_files = []
 
@@ -78,21 +64,27 @@ class Main(QObject):
     # Protected & Private Methods
     def _auth_phone(self):
         print(self._auth_state)
-        self._auth_state = Telegram.login(self.user_phone, self.security_code, self.two_factor)
+        self._auth_state = self.loop.run_until_complete(self.telegram.connect(self.user_phone.replace("-", ""),
+                                                                              self.security_code,
+                                                                              self.two_factor))
 
     def _auth_sec_code(self):
         print(self._auth_state)
         if not self.security_code:
             self.security_code = input("Please ENTER SECURITY CODE: ")
             return
-        self._auth_state = Telegram.login(self.user_phone, self.security_code, self.two_factor)
+        self._auth_state = self.loop.run_until_complete(self.telegram.connect(self.user_phone.replace("-", ""),
+                                                                              self.security_code,
+                                                                              self.two_factor))
 
     def _auth_2fa(self):
         print(self._auth_state)
         if not self.two_factor:
             self.two_factor = input("Please ENTER 2FA CODE: ")
             return
-        self._auth_state = Telegram.login(self.user_phone, self.security_code, self.two_factor)
+        self._auth_state = self.loop.run_until_complete(self.telegram.connect(self.user_phone.replace("-", ""),
+                                                                              self.security_code,
+                                                                              self.two_factor))
 
     def _auth_success(self):
         print(self._auth_state)
@@ -215,8 +207,10 @@ class Main(QObject):
             if not os.path.exists(path):
                 print("Non existing file: ", path)
                 continue
-
-            if Telegram.upload_file(path):
+            print("Uploading...", path)
+            upload_res = self.loop.run_until_complete(self.telegram.upload_file_to_me(path))
+            print("Upload result: ", upload_res)
+            if upload_res:
                 self.db.insert_dirty_file(hsh)
 
         self._proc_state = ProcessState.FILES_SENT

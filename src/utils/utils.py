@@ -40,3 +40,17 @@ class SessionState(IntEnum):
     NO_SESSION = auto()
     CREATE_SESSION = auto()
     SESSION_EXISTS = auto()
+
+
+class ProcessState(IntEnum):
+    """
+    Overall State process
+    CHECK_FILES: referrer FileState
+    CHECK_CONNECTION: referrer ConnectionState, SessionState
+    SENDING_FILES: sending each file to the telegram direct (in this process for each file after sent it should be store in DataBase)
+    FILES_SENT: last state it should be reset all of memories and re-processing by CHECK_FILES
+    """
+    CHECK_FILES = auto()
+    CHECK_CONNECTION = auto()
+    SENDING_FILES = auto()
+    FILES_SENT = auto()

@@ -27,9 +27,25 @@ class ConnectionState(IntEnum):
     CONNECTED = auto()
 
 
+class AuthState(IntEnum):
+    """
+    Telegram Authorization State
+    AUTH_PHONE: apply login using phone number
+    AUTH_SEC_CODE: apply security code
+    AUTH_2FA: optional apply 2fa
+    AUTH_SUCCESS: Everything fine and auth completed (next state is saving phone number session)
+    AUTH_FAILED: process failed and should be start at first state
+    """
+    AUTH_PHONE = auto()
+    AUTH_SEC_CODE = auto()
+    AUTH_2FA = auto()
+    AUTH_SUCCESS = auto()
+    AUTH_FAILED = auto()
+
+
 class SessionState(IntEnum):
     """
-    Telegram Session state using self DataBase (sqlite)
+    Database Session state using self DataBase (sqlite)
 
     CHECK_SESSION: fetching session from TABLE .
     NO_SESSION: after fetch if it is empty.

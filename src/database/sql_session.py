@@ -74,6 +74,14 @@ class DataBase:
         except Exception as ex:
             print(f"Exception {self.__class__.__name__}.{inspect.currentframe().f_code.co_name}\n{ex}")
 
+    def delete_all_tel_items(self):
+        try:
+            QUERY = "DELETE FROM tel_session;"
+            self._cursor.execute(QUERY)
+            self._sql.commit()
+        except Exception as ex:
+            print(f"Exception {self.__class__.__name__}.{inspect.currentframe().f_code.co_name}\n{ex}")
+
     def delete_all_dirty_files(self):
         try:
             QUERY = "DELETE FROM dirty_files;"

@@ -32,7 +32,7 @@ class CustomQMenu(QMenu):
                             }
 
                             QMenu::item:selected {
-                                background-color: #009688;    /* Hover background color */
+                                background-color: orange;    /* Hover background color */
                                 color: #FFFFFF;                /* White text color on hover */
                             }
                             """)

@@ -1,4 +1,4 @@
-from PyQt5.QtCore import QObject, QTimer, pyqtSlot
+from PyQt5.QtCore import QObject, QTimer, pyqtSlot, QThread, pyqtSignal, pyqtProperty
 
 from src.cusqt.custom_widgets import QApplication
 from src.utils.utils import ConnectionState, SessionState, ProcessState, AuthState
@@ -33,8 +33,16 @@ class Main(QObject):
     two_factor: str = ""
     available_files: list[FileInfo]
 
+    # Signals
+
+    requestWindowVisible = pyqtSignal(bool)  # True == Show & False == Hide
+
     def __init__(self, parent=None):
         super(Main, self).__init__(parent)
+
+
+        # Make Connections
+        self._make_connections()
 
         # Async Event Loop
         self.loop = asyncio.new_event_loop()
@@ -66,6 +74,10 @@ class Main(QObject):
         self._timer.start()
 
     # Protected & Private Methods
+    def _make_connections(self):
+        QApplication.hide_action.triggered.connect(lambda: self.requestWindowVisible.emit(False))
+        QApplication.show_action.triggered.connect(lambda: self.requestWindowVisible.emit(True))
+
     def _auth_phone(self):
         print(self._auth_state)
         self._auth_state = self.loop.run_until_complete(self.telegram.connect(self.user_phone.replace("-", ""),

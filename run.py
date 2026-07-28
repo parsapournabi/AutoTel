@@ -61,7 +61,9 @@ if __name__ == "__main__":
     _main = Main()
     engine.rootContext().setContextProperty("_main", _main)
 
-    engine.load("qrc:/qml/main.qml")
+    engine.addImportPath(os.curdir.join("qml/"))
+    engine.addImportPath("qml/")
+    engine.load("qml/main.qml")
     if not engine.rootObjects():
         sys.exit(-1)
     sys.exit(app.exec())

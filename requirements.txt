@@ -11,6 +11,7 @@ packaging==26.2
 parso==0.8.7
 pathspec==1.1.1
 pefile==2024.8.26
+phonenumbers==9.0.35
 platformdirs==4.11.0
 pluggy==1.6.0
 pyaes==1.6.1

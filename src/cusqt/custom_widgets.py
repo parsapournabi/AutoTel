@@ -49,6 +49,7 @@ class CustomQMenu(QMenu):
 class QApplication(QtWidgets.QApplication):
     show_action: QAction = None
     hide_action: QAction = None
+    mute_notification_action: QAction = None
     flatlay_action: QAction = None
     tray_icon: QSystemTrayIcon = None
     os_platform: str = ""  # [WINDOWS, MAC]
@@ -56,6 +57,8 @@ class QApplication(QtWidgets.QApplication):
     regular_font_family: str = ""
     bold_font_family: str = ""
     italic_font_family: str = ""
+
+    is_notification_muted: bool = False
 
     def __init__(self, sys_argv):
         super().__init__(sys_argv)
@@ -90,9 +93,13 @@ class QApplication(QtWidgets.QApplication):
                                QIcon.State.Off)
         self.quit_action = QAction('Quit')
         QApplication.hide_action = QAction('Hide')
-        QApplication.flatlay_action = QAction()
-        QApplication.flatlay_action.setIcon(flatlay_icon)
-        QApplication.flatlay_action.setText("Copilot Login")
+        QApplication.mute_notification_action = QAction("Mute")
+        QApplication.mute_notification_action.triggered.connect(self._onMuteActionTriggered)
+
+        # QApplication.flatlay_action = QAction()
+        # QApplication.flatlay_action.setIcon(flatlay_icon)
+        # QApplication.flatlay_action.setText("Copilot Login")
+
         # Creating Social Media Login Logout actions
 
         # for social_media in AvailableSocialMedias:
@@ -106,14 +113,14 @@ class QApplication(QtWidgets.QApplication):
         #     action.setText(f"{social_media.Name} Login")
         #     action.setEnabled(False)
 
-        QApplication.show_action = QAction("Open Copilot")
+        QApplication.show_action = QAction("Show")
 
         # Action signals
         self.quit_action.triggered.connect(self._exit_app)
 
         # Add Actions to QTray menu
         self.tray_menu.addAction(QApplication.show_action)
-        self.tray_menu.addMenu(self.tray_menu_social_media)
+        # self.tray_menu.addMenu(self.tray_menu_social_media)
 
         # Adding social Media Icon
         # for social_media in AvailableSocialMedias[::-1]:
@@ -134,6 +141,8 @@ class QApplication(QtWidgets.QApplication):
     @staticmethod
     def notification_show(data):
         """Sending OS System Notification -> title can be [info, Warning, Error]"""
+        if QApplication.is_notification_muted:
+            return
         message, title = data
         dict_icons: dict = {'Information': QSystemTrayIcon.Information,
                             'Warning': QSystemTrayIcon.Warning,
@@ -155,3 +164,7 @@ class QApplication(QtWidgets.QApplication):
     def _exit_app(self):
         self.shared_memory.detach()
         QApplication.quit()
+
+    def _onMuteActionTriggered(self):
+        QApplication.is_notification_muted = not QApplication.is_notification_muted
+        self.mute_notification_action.setText("UnMute" if QApplication.is_notification_muted else "Mute")

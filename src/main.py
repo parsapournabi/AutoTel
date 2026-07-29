@@ -131,15 +131,15 @@ class Main(QObject):
         return path
 
     def notifyInsertPhone(self):
-        self.notification(NotificationType.INFO, "Please Insert your phone number")
+        self.notification(NotificationType.WARNING, "Please Insert your phone number")
         self.requestInsertPhone.emit()
 
     def notifyInsertSecCode(self):
-        self.notification(NotificationType.INFO, "Please Insert security code")
+        self.notification(NotificationType.WARNING, "Please Insert security code")
         self.requestInsertSecCode.emit()
 
     def notifyInsert2FA(self):
-        self.notification(NotificationType.INFO, "Please Insert 2FA code")
+        self.notification(NotificationType.WARNING, "Please Insert 2FA code")
         self.requestInsert2FA.emit()
 
     # Protected & Private Methods

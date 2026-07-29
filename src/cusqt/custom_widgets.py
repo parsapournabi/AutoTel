@@ -1,10 +1,12 @@
 from PyQt5 import QtGui
 from PyQt5 import QtWidgets
-from PyQt5.QtCore import Qt, QSharedMemory
+from PyQt5.QtCore import Qt, QSharedMemory, QElapsedTimer
 from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import QSystemTrayIcon, QMenu, QAction
 
 from src.meta import resources_rc
+
+NEXT_NOTIFICATION_DELAY = 30000
 
 
 class CustomQMenu(QMenu):
@@ -59,6 +61,8 @@ class QApplication(QtWidgets.QApplication):
     italic_font_family: str = ""
 
     is_notification_muted: bool = False
+
+    _next_notification_timer = QElapsedTimer()
 
     def __init__(self, sys_argv):
         super().__init__(sys_argv)
@@ -138,11 +142,18 @@ class QApplication(QtWidgets.QApplication):
         # Show the tray icon
         QApplication.tray_icon.show()
 
+        # Initial value
+        QApplication._next_notification_timer.start()
+
     @staticmethod
     def notification_show(data):
         """Sending OS System Notification -> title can be [info, Warning, Error]"""
         if QApplication.is_notification_muted:
             return
+        if QApplication._next_notification_timer.elapsed() < NEXT_NOTIFICATION_DELAY:
+            return
+        QApplication._next_notification_timer.restart()
+
         message, title = data
         dict_icons: dict = {'Information': QSystemTrayIcon.Information,
                             'Warning': QSystemTrayIcon.Warning,

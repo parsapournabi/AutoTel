@@ -1,4 +1,12 @@
 import os
+import phonenumbers
+
+
+def is_valid_phone(phone: str) -> bool:
+    try:
+        return phonenumbers.is_valid_number(phonenumbers.parse(phone))
+    except phonenumbers.NumberParseException:
+        return False
 
 
 def iter_files(root, extensions=None):

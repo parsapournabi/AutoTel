@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import QSystemTrayIcon, QMenu, QAction
 
 from src.meta import resources_rc
 
-NEXT_NOTIFICATION_DELAY = 30000
+NEXT_NOTIFICATION_DELAY = 5000
 
 
 class CustomQMenu(QMenu):
@@ -132,7 +132,7 @@ class QApplication(QtWidgets.QApplication):
         #                      self.base_social_tray_action_name + social_media.Name)
         #     self.tray_menu_social_media.addAction(action)
 
-        self.tray_menu.addAction(QApplication.flatlay_action)
+        self.tray_menu.addAction(QApplication.mute_notification_action)
         self.tray_menu.addAction(QApplication.hide_action)
         self.tray_menu.addAction(self.quit_action)
 
@@ -148,13 +148,15 @@ class QApplication(QtWidgets.QApplication):
     @staticmethod
     def notification_show(data):
         """Sending OS System Notification -> title can be [info, Warning, Error]"""
+
         if QApplication.is_notification_muted:
             return
-        if QApplication._next_notification_timer.elapsed() < NEXT_NOTIFICATION_DELAY:
+
+        message, title = data
+        if title != "info" and QApplication._next_notification_timer.elapsed() < NEXT_NOTIFICATION_DELAY:
             return
         QApplication._next_notification_timer.restart()
 
-        message, title = data
         dict_icons: dict = {'Information': QSystemTrayIcon.Information,
                             'Warning': QSystemTrayIcon.Warning,
                             'Error': QSystemTrayIcon.Critical}

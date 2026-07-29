@@ -44,6 +44,8 @@ class Main(QObject):
     requestInsertPhone = pyqtSignal()
     requestInsertSecCode = pyqtSignal()
     requestInsert2FA = pyqtSignal()
+    telegramAuthSuccessful = pyqtSignal()
+    telegramAuthFailed = pyqtSignal()
 
     requestWindowVisible = pyqtSignal(bool)  # True == Show & False == Hide
 
@@ -175,6 +177,7 @@ class Main(QObject):
     def _auth_success(self):
         print(self._auth_state)
         self._session_state = SessionState.CREATE_SESSION
+        self.telegramAuthSuccessful.emit()
 
     def _auth_failed(self):
         print(self._auth_state)
@@ -184,6 +187,7 @@ class Main(QObject):
         self._conn_state = ConnectionState.NO_NETWORK
         self._session_state = SessionState.CHECK_SESSION
         self._auth_state = AuthState.AUTH_PHONE
+        self.telegramAuthFailed.emit()
 
     def _check_session(self):
         print(self._session_state)

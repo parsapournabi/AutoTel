@@ -14,7 +14,7 @@ class FileInfo:
 
 
 class FileManager(QObject):
-    _targetPath: str = os.path.join(os.path.expanduser("~"), "Pictures/Screenshots")
+    _targetPath: str = ""
     targetPathChanged = pyqtSignal()
 
     def __init__(self, parent=None):

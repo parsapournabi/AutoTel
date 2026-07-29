@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import QSystemTrayIcon, QMenu, QAction
 
 from src.meta import resources_rc
 
-NEXT_NOTIFICATION_DELAY = 5000
+NEXT_NOTIFICATION_DELAY = 15000
 
 
 class CustomQMenu(QMenu):
@@ -60,7 +60,7 @@ class QApplication(QtWidgets.QApplication):
     bold_font_family: str = ""
     italic_font_family: str = ""
 
-    is_notification_muted: bool = False
+    is_notification_muted: bool = True
 
     _next_notification_timer = QElapsedTimer()
 
@@ -97,7 +97,7 @@ class QApplication(QtWidgets.QApplication):
                                QIcon.State.Off)
         self.quit_action = QAction('Quit')
         QApplication.hide_action = QAction('Hide')
-        QApplication.mute_notification_action = QAction("Mute")
+        QApplication.mute_notification_action = QAction("UnMute")
         QApplication.mute_notification_action.triggered.connect(self._onMuteActionTriggered)
 
         # QApplication.flatlay_action = QAction()

@@ -37,16 +37,6 @@ if __name__ == "__main__":
         base_path = sys._MEIPASS
     else:
         base_path = os.path.dirname(os.path.abspath(__file__))
-    # bold_id = QFontDatabase.addApplicationFont(os.path.join(base_path, "src/gui/fonts/AvenirNextLTPro-Bold.otf"))
-    # It_id = QFontDatabase.addApplicationFont(os.path.join(base_path, "src/gui/fonts/AvenirNextLTPro-It.otf"))
-    # reg_id = QFontDatabase.addApplicationFont(os.path.join(base_path, "src/gui/fonts/AvenirNextLTPro-Regular.otf"))
-    # if bold_id > 0:
-    #     QApplication.bold_font_family = QFontDatabase.applicationFontFamilies(bold_id)[0]
-    # if It_id > 0:
-    #     QApplication.italic_font_family = QFontDatabase.applicationFontFamilies(It_id)[0]
-    # if reg_id > 0:
-    #     QApplication.regular_font_family = QFontDatabase.applicationFontFamilies(reg_id)[0]
-    # Fonts configured
 
     sys.excepthook = exception_handler
     app.os_platform = platform
@@ -61,9 +51,10 @@ if __name__ == "__main__":
     _main = Main()
     engine.rootContext().setContextProperty("_main", _main)
 
-    engine.addImportPath(os.curdir.join("qml/"))
-    engine.addImportPath("qml/")
-    engine.load("qml/main.qml")
+    qml_path = os.path.join(base_path, "qml/")
+
+    engine.addImportPath(qml_path)
+    engine.load(os.path.join(qml_path, "main.qml"))
     if not engine.rootObjects():
         sys.exit(-1)
     sys.exit(app.exec())

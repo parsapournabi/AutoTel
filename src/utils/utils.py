@@ -72,3 +72,15 @@ class ProcessState(IntEnum):
     CHECK_CONNECTION = auto()
     SENDING_FILES = auto()
     FILES_SENT = auto()
+
+
+class NotificationType(IntEnum):
+    """
+    QSystemTrayIcon notification
+    INFO: information type
+    WARNING: warning type
+    ERROR: Critical type
+    """
+    INFO = auto()
+    WARNING = auto()
+    ERROR = auto()

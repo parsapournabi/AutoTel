@@ -1,10 +1,11 @@
-from PyQt5.QtCore import QObject, QTimer, pyqtSlot, QThread, pyqtSignal, pyqtProperty
+from PyQt5.QtCore import QObject, QTimer, pyqtSlot, QSettings, pyqtSignal, pyqtProperty
 
 from src.cusqt.custom_widgets import QApplication
-from src.utils.utils import ConnectionState, SessionState, ProcessState, AuthState
+from src.utils.utils import ConnectionState, SessionState, ProcessState, AuthState, NotificationType
 from src.database.sql_session import DataBase
 from src.utils.file_manager import FileManager, FileInfo
 from src.utils.network_manager import NetworkManager
+from src.utils.global_logic import is_valid_phone
 from src.robot.telegram import Telegram
 
 from dotenv import load_dotenv
@@ -32,14 +33,32 @@ class Main(QObject):
     security_code: str = ""
     two_factor: str = ""
     available_files: list[FileInfo]
+    _success_files: int = 0
+
+    # Properties
+    _telegramInprogress: bool = False
 
     # Signals
+    telegramInprogressChanged = pyqtSignal()
+
+    requestInsertPhone = pyqtSignal()
+    requestInsertSecCode = pyqtSignal()
+    requestInsert2FA = pyqtSignal()
 
     requestWindowVisible = pyqtSignal(bool)  # True == Show & False == Hide
+
+    # Internal Signal
+    requestShowNotification = pyqtSignal(tuple)  # mesasge, title
 
     def __init__(self, parent=None):
         super(Main, self).__init__(parent)
 
+        # Thread
+        # self.thread = QThread()
+        # self.moveToThread(self.thread)
+
+        # Thread connection
+        # self.thread.start()
 
         # Make Connections
         self._make_connections()
@@ -66,6 +85,20 @@ class Main(QObject):
 
         # Connections
         self._timer.timeout.connect(self._update)
+        self.start()
+
+    # Properties
+    @pyqtProperty(bool)
+    def telegramInprogress(self):
+        return self._telegramInprogress
+
+    @telegramInprogress.setter
+    def telegramInprogress(self, value):
+        if value == self._telegramInprogress:
+            return
+
+        self._telegramInprogress = value
+        self.telegramInprogressChanged.emit()
 
     # Public Methods
 
@@ -73,10 +106,45 @@ class Main(QObject):
     def start(self):
         self._timer.start()
 
+    @pyqtSlot(str, str, str)
+    def applyPhoneInfo(self, phone: str, security_code: str, two_factor: str):
+        if not is_valid_phone(phone):
+            self.notification(NotificationType.ERROR, "Invalid Phone number!")
+            return
+        self.user_phone = phone
+        self.security_code = security_code
+        self.two_factor = two_factor
+
+    @pyqtSlot(str)
+    def applyDirectoryPath(self, path: str):
+        self.file_manager.targetPath = path.replace("file:///", "")
+
+    @pyqtSlot(result=str)
+    def getDirectoryPath(self) -> str:
+        settings = QSettings(QSettings.IniFormat,
+                             QSettings.UserScope,
+                             QApplication.organizationName(),
+                             QApplication.applicationName())
+        path = str(settings.value("DIRECTORY_PATH", os.path.join(os.path.expanduser("~"), "Pictures/Screenshots")))
+        return path
+
+    def notifyInsertPhone(self):
+        self.notification(NotificationType.INFO, "Please Insert your phone number")
+        self.requestInsertPhone.emit()
+
+    def notifyInsertSecCode(self):
+        self.notification(NotificationType.INFO, "Please Insert security code")
+        self.requestInsertSecCode.emit()
+
+    def notifyInsert2FA(self):
+        self.notification(NotificationType.INFO, "Please Insert 2FA code")
+        self.requestInsert2FA.emit()
+
     # Protected & Private Methods
     def _make_connections(self):
         QApplication.hide_action.triggered.connect(lambda: self.requestWindowVisible.emit(False))
         QApplication.show_action.triggered.connect(lambda: self.requestWindowVisible.emit(True))
+        self.requestShowNotification.connect(QApplication.notification_show)
 
     def _auth_phone(self):
         print(self._auth_state)
@@ -87,7 +155,8 @@ class Main(QObject):
     def _auth_sec_code(self):
         print(self._auth_state)
         if not self.security_code:
-            self.security_code = input("Please ENTER SECURITY CODE: ")
+            self.notifyInsertSecCode()
+            # self.security_code = input("Please ENTER SECURITY CODE: ")
             return
         self._auth_state = self.loop.run_until_complete(self.telegram.connect(self.user_phone.replace("-", ""),
                                                                               self.security_code,
@@ -96,7 +165,8 @@ class Main(QObject):
     def _auth_2fa(self):
         print(self._auth_state)
         if not self.two_factor:
-            self.two_factor = input("Please ENTER 2FA CODE: ")
+            # self.two_factor = input("Please ENTER 2FA CODE: ")
+            self.notifyInsert2FA()
             return
         self._auth_state = self.loop.run_until_complete(self.telegram.connect(self.user_phone.replace("-", ""),
                                                                               self.security_code,
@@ -134,18 +204,26 @@ class Main(QObject):
     def _no_session(self):
         print(self._session_state)
         if not self.user_phone:
-            self.user_phone = input("PLEASE INSERT YOUR PHONE NUMBER: ")
+            # self.user_phone = input("PLEASE INSERT YOUR PHONE NUMBER: ")
+            self.notifyInsertPhone()
             return
         match self._auth_state:
             case AuthState.AUTH_PHONE:
+                self.telegramInprogress = True
                 self._auth_phone()
             case AuthState.AUTH_SEC_CODE:
+                self.telegramInprogress = True
                 self._auth_sec_code()
             case AuthState.AUTH_2FA:
+                self.telegramInprogress = True
                 self._auth_2fa()
             case AuthState.AUTH_SUCCESS:
+                self.telegramInprogress = False
+                self.notification(NotificationType.INFO, "Telegram authentication was successful")
                 self._auth_success()
             case AuthState.AUTH_FAILED:
+                self.telegramInprogress = False
+                self.notification(NotificationType.ERROR, "Unable to authenticate in Telegram")
                 self._auth_failed()
 
     def _create_session(self):
@@ -165,6 +243,7 @@ class Main(QObject):
         else:
             # If internet has disconnected or not connected telegram should be re-login
             self._session_state = SessionState.CHECK_SESSION
+            self.notification(NotificationType.WARNING, "No such Internet connection exists!")
 
     def _no_proxy(self):
         print(self._conn_state)
@@ -174,6 +253,7 @@ class Main(QObject):
         else:
             # If internet has disconnected or not connected telegram should be re-login
             self._session_state = SessionState.CHECK_SESSION
+            self.notification(NotificationType.WARNING, "No such Proxy/VPN is connected (Enable Tun/Tunnel mode)")
 
     def _disconnected(self):
         print(self._conn_state)
@@ -195,6 +275,12 @@ class Main(QObject):
         print(self._proc_state)
         if availableFiles := self.file_manager.compare_files(self.db.fetch_all_dirty_files(),
                                                              self.file_manager.get_current_files()):
+            settings = QSettings(QSettings.IniFormat,
+                                 QSettings.UserScope,
+                                 QApplication.organizationName(),
+                                 QApplication.applicationName())
+            path = self.file_manager._targetPath
+            settings.setValue("DIRECTORY_PATH", path)
             print("Available FILES: ", availableFiles, self.db.fetch_all_dirty_files())
             self.available_files = availableFiles
             # Goto next state
@@ -217,6 +303,8 @@ class Main(QObject):
 
     def _sending_files(self):
         print(self._proc_state)
+        self.notification(NotificationType.INFO, f"Trying to send {len(self.available_files)} files...")
+        self._success_files = 0
         for file in self.available_files:
             path, hsh = file.path, file.hash
             print("Current file: ", path, hsh)
@@ -228,11 +316,14 @@ class Main(QObject):
             print("Upload result: ", upload_res)
             if upload_res:
                 self.db.insert_dirty_file(hsh)
+                self._success_files += 1
 
         self._proc_state = ProcessState.FILES_SENT
 
     def _files_sent(self):
         print(self._proc_state)
+        self.notification(NotificationType.INFO,
+                          f"Uploading files process has completed. {int(self._success_files / len(self.available_files) * 100)} % was successful")
 
         # Restoring Memories (Only the safe ones)
         self._proc_state = ProcessState.CHECK_FILES
@@ -240,12 +331,21 @@ class Main(QObject):
     def _update(self):
         match self._proc_state:
             case ProcessState.CHECK_FILES:
+                self.telegramInprogress = False
                 self._check_files()
             case ProcessState.CHECK_CONNECTION:
                 self._check_connection()
             case ProcessState.SENDING_FILES:
+                self.telegramInprogress = True
                 self._sending_files()
             case ProcessState.FILES_SENT:
+                self.telegramInprogress = False
                 self._files_sent()
             case _:
                 print("Invalid State for ProcessState", self._proc_state)
+
+    # Pure Private functions
+    def notification(self, message_type: NotificationType, message: str):
+        TITLES = ["info", "Warning", "Error"]
+        title = TITLES[message_type]
+        self.requestShowNotification.emit((message, title))

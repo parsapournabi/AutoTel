@@ -48,9 +48,15 @@ Item {
                         Layout.preferredHeight: 40
                         level: 2
                         placeholderText: "Path/To/Your/Folder"
-                        text: folderDialog.currentFolder
                         font {
                             pixelSize: 16
+                        }
+                        onTextChanged: {
+                            _main.applyDirectoryPath(text);
+                        }
+
+                        Component.onCompleted: {
+                            text = _main.getDirectoryPath();
                         }
                     }
 
@@ -105,7 +111,8 @@ Item {
                         CusBusyIndicator {
                             id: busyIndicator
                             anchors.verticalCenter: parent.verticalCenter
-                            running: true
+                            visible: _main.telegramInprogress
+                            running: visible
                             scale: 0.6
                         }
                     }
@@ -147,6 +154,13 @@ Item {
                     font {
                         pixelSize: 16
                     }
+                    onClicked: {
+                        const phone = lineEditPhoneNumber.text;
+                        const secCode = lineEditSecurityCode.visible ? lineEditSecurityCode.text : "";
+                        const twoFA = lineEdit2FA.visible ? lineEdit2FA.text : "";
+
+                        _main.applyPhoneInfo(phone, secCode, twoFA);
+                    }
                 }
 
                 // Spacer
@@ -169,6 +183,10 @@ Item {
     // Popup
     QL.FolderDialog {
         id: folderDialog
+        flags: Q.FolderDialog.DontResolveSymlinks
+        onAccepted: {
+            lineEditFolderPath.text = folder;
+        }
     }
 
     // Resources

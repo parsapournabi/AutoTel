@@ -122,7 +122,8 @@ Item {
                     id: lineEditSecurityCode
                     Layout.preferredWidth: lineEditFolderPath.width
                     Layout.preferredHeight: 40
-                    // visible: false
+                    enabled: false
+                    visible: enabled
                     level: 2
                     placeholderText: "XXXXX"
                     horizontalAlignment: Qt.AlignHCenter
@@ -135,7 +136,8 @@ Item {
                     id: lineEdit2FA
                     Layout.preferredWidth: lineEditFolderPath.width
                     Layout.preferredHeight: 40
-                    visible: false
+                    enabled: false
+                    visible: enabled
                     level: 2
                     placeholderText: "2FA"
                     horizontalAlignment: Qt.AlignHCenter
@@ -148,6 +150,7 @@ Item {
                     id: btnLogin
                     Layout.preferredWidth: lineEditFolderPath.width
                     Layout.preferredHeight: 40
+                    enabled: lineEditPhoneNumber.enabled
                     level: 2
                     flat: false
                     text: "Login"
@@ -192,5 +195,32 @@ Item {
     // Resources
     WeaQuick.GlobalContext {
         id: wQuick
+    }
+
+    /** Connections **/
+    Connections {
+        target: _main
+
+        function onRequestInsertPhone() {
+            lineEditPhoneNumber.enabled = true;
+        }
+
+        function onRequestInsertSecCode() {
+            lineEditSecurityCode.enabled = true;
+        }
+
+        function onRequestInsert2FA() {
+            lineEditPhoneNumber.enabled = true;
+        }
+
+        function onTelegramAuthSuccessful() {
+            lineEditPhoneNumber.enabled = false;
+            lineEditSecurityCode.enabled = false;
+            lineEdit2FA.enabled = false;
+        }
+
+        function onTelegramAuthFailed() {
+            lineEditPhoneNumber.enabled = true;
+        }
     }
 }

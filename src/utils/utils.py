@@ -81,6 +81,6 @@ class NotificationType(IntEnum):
     WARNING: warning type
     ERROR: Critical type
     """
-    INFO = auto()
-    WARNING = auto()
-    ERROR = auto()
+    INFO = 0
+    WARNING = 1
+    ERROR = 2
